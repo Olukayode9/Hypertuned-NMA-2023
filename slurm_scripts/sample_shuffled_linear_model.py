@@ -1,9 +1,11 @@
 ''' This script is intended to shift the neural data by a random amount, then select the central 5000 timepoints (to avoid edge effects between beginning and end of the data) and calculate the fit of a linear model to it. This will sample a distribution of weights and fit qualities that can be used to estimate significance of the paramters found for the non-shifted data'''
+
 import matplotlib
 import joblib
 from joblib import Parallel, delayed
 from matplotlib import gridspec
 from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib.pyplot as plt
 from pandas.plotting import autocorrelation_plot
 from sklearn.model_selection import train_test_split, TimeSeriesSplit
 from sklearn.metrics import median_absolute_error
@@ -14,7 +16,9 @@ from sklearn.linear_model import RidgeCV
 from sklearn.pipeline import make_pipeline
 import scipy as sp
 import numpy as np
+import os
 import pandas as pd
+
 
 class EvaluateLinear():
 
@@ -161,38 +165,34 @@ def circular_shift_model(X: np.ndarray, y: np.ndarray, n_shifts: int = 10, alpha
         # Only take the middle 5000 frames, to avoid edge effects
         shift = np.random.randint(0, X.shape[1]-5000)
 
-        print(f"X shape : {X.shape}")
         X_iter = np.roll(X, shift, axis=1)
         X_iter = X_iter[1009:-1009, :]
-        print(f"X_iter shape : {X_iter.shape}")
 
         # Split the data into train and test sets
         X_train, X_test, y_train, y_test = train_test_split(X_iter, y, test_size=0.5, shuffle=False)
 
         # Fit the model
-        model = find_optimal_alpha(X_train, y_train, alpha)
+        shift_model = find_optimal_alpha(X_train, y_train, alpha)
 
 
-        mae_train = median_absolute_error(y_train, model.predict(X_train))
-        y_pred = model.predict(X_test)
-        weight_distributions[:, i] = model.named_steps['ridgecv'].coef_
-        alphas[i] = model.named_steps['ridgecv'].alpha_
+        mae_train = median_absolute_error(y_train, shift_model.predict(X_train))
+        y_pred = shift_model.predict(X_test)
+        weight_distributions[:, i] = shift_model.named_steps['ridgecv'].coef_
+        alphas[i] = shift_model.named_steps['ridgecv'].alpha_
         maes[i] = median_absolute_error(y_test, y_pred)
 
     return weight_distributions, alphas, maes
 
+def process_behavior(behavior, name, n_shifts: int, save_path: str) -> None:
 
-
-def process_behavior(behavior, name):
-  save_path = "/scratch/wiessall/simple"
   y = behavior
 
   X_train, X_test, y_train, y_test = train_test_split(X[1009:-1009, :], y[1009:-1009], test_size=0.5, shuffle=False)
-  model = find_optimal_alpha(X_train, y_train)
-  alpha =  model.named_steps['ridgecv'].alpha_
+  mod = find_optimal_alpha(X_train, y_train)
+  alpha =  mod.named_steps['ridgecv'].alpha_
   weight_distributions, alphas, maes = circular_shift_model(X, y, n_shifts=n_shifts, alpha=alpha)# Save the 2D array to a .npy file
   filename = f"{name}_weights.npy"
-  np.save(filename, weight_distributions)
+  np.save(os.path.join(save_path, filename), weight_distributions)
 
   # create a list of column names
   alpha_cols = [f'alpha_{i}' for i in range(n_shifts)]
@@ -206,20 +206,20 @@ def process_behavior(behavior, name):
 
   # add the remaining columns
   df['weight_distributions'] = [filename]*X.shape[1]
-  df['model_weights'] = model.named_steps['ridgecv'].coef_
+  df['model_weights'] = np.squeeze(mod.named_steps['ridgecv'].coef_)
   df['model_alphas'] =  [alpha]*X.shape[1]
-  df['model_maes'] = [median_absolute_error(y_train, model.predict(X_train))]*X.shape[1]
+  df['model_maes'] = [median_absolute_error(y_train, mod.predict(X_train))]*X.shape[1]
 
   # Save the DataFrame to a .parquet file without compression
   df.to_parquet(f"{save_path}/{name}_data.parquet", compression=None)
 
-  joblib.dump(model, f"{save_path}/{name}_model.pkl")
+  joblib.dump(mod, f"{save_path}/{name}_model.pkl")
 
-  evaluator = EvaluateLinear(model, X_train, y_train, X_test, y_test)
+  evaluator = EvaluateLinear(mod, X_train, y_train, X_test, y_test)
   evaluator.compose_plots(export_path=f"{save_path}/{name}_evaluate.pdf")
 
 
-save_path = "/scratch/wiessall/simple"
+save_path = "/s"
 #Take only central part of the data
 dat = np.load(f'{save_path}/stringer_spontaneous.npy', allow_pickle=True).item()
 pupil = dat['pupilArea']
@@ -234,8 +234,6 @@ sq_distance = np.sum(sq_diff, axis=1)
 distance = np.sqrt(sq_distance)
 eye_speed = distance
 eye_speed = np.pad(eye_speed, (0,1), mode='mean')
-
-
 
 def nan_helper(y):
     """Helper to handle indices and logical indices of NaNs.
@@ -253,6 +251,7 @@ def nan_helper(y):
     """
 
     return np.isnan(y), lambda z: z.nonzero()[0]
+
 nans, x= nan_helper(eye_speed)
 eye_speed[nans]= np.interp(x(nans), x(~nans), eye_speed[~nans])
 
@@ -262,7 +261,22 @@ behaviors.extend(face)
 face_name = [f"face_{i}" for i in range(1000)]
 behavior_names = ["pupil", "eye_position", "locomotion"]
 behavior_names.extend(face_name)
-####
 X = dat['sresp'].T
 n_shifts = 50
-Parallel(n_jobs=1)(delayed(process_behavior)(behavior, name) for behavior, name in zip(behaviors[:], behavior_names[:]))
+Parallel(n_jobs=-1)(delayed(process_behavior)(behavior, name, n_shifts, save_path) for behavior, name in zip(behaviors[:], behavior_names[:]))
+
+
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               
+~                                                                                                                                                                                   
