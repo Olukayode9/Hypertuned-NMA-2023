@@ -1,2 +1,16 @@
 * NMA2023
-This is the code repository for the Project Group 'Hypertuned' from megapod 'Compogsnauthus_Belly'. Currently this is a placeholder, project code will follow.
+** Project team members
+  - Olukayode Arowosegbe
+  - Polina Buzaeva
+  - Tristan Wiessalla
+  - Verena Peterreins
+  - Yang Yue
+  - Zhiyi Chen
+** Project Abstract
+  Even in the absence of sensory inputs, neurons in sensory brain areas reveal structured activity. Previous work has shown that this activity is linked to behavior suggesting that sensory brain areas contain a multidimensional representation of behavior.
+However, it remains unclear if single neurons encode multiple behavioral dimensions. Here, we use data of V1 activity obtained by Stringer et al. 2019 to predict multiple behavioral dimensions, such as locomotion speed, pupil diameter, pupil speed and the SVD decomposition of the whole face motion energy.
+We hypothesize that encoding of these behavioral dimensions is shared across many neurons, as these behaviors show high pairwise correlations. 
+This hypothesis will be tested by using L2-regularized linear regression models to determine neurons that contribute significantly to the encoding of each of those behavioral dimensions, separately. Comparing the populations of neurons encoding any of those dimensions is expected to reveal a high overlap between them. Concurrently, we will investigate if lower-dimensional representations of the overall neuronal activity do or do not reveal functional clusters. Both methods combined will inform us if the V1 population of neurons is homogeneously encoding motor behaviors or brain states related to them or if different V1 populations receive separate efferent copies of these motor behaviors. 
+Together, our findings will add to the growing evidence that sensory inputs are integrated with motor actions as early as the early sensory cortex and will aid in revealing mechanisms, how these computations are performed. 
+** Project Presentation
+  [[project_final_presentation.pdf][Presentation of status in July 2023]]
